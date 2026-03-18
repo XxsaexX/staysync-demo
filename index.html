@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>StaySync — Reservation Automation Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+:root{--bg:#0f0f0f;--surface:#161616;--surface2:#1e1e1e;--border:#2a2a2a;--accent:#c9f542;--accent2:#42f5c9;--danger:#f54242;--warn:#f5a442;--text:#f0ede8;--muted:#7a7a7a;--success:#42f5a4;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+
+header{border-bottom:1px solid var(--border);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(15,15,15,0.92);backdrop-filter:blur(12px);z-index:100;}
+.logo{font-family:'DM Serif Display',serif;font-size:22px;letter-spacing:-0.5px;}
+.logo span{color:var(--accent);}
+.badge{font-family:'DM Mono',monospace;font-size:11px;background:var(--accent);color:#000;padding:3px 10px;border-radius:20px;font-weight:500;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.sheets-status{font-size:11px;font-family:'DM Mono',monospace;padding:4px 12px;border-radius:20px;border:1px solid var(--border);color:var(--muted);}
+.sheets-status.connected{border-color:rgba(66,245,164,0.4);color:var(--success);}
+.sheets-status.error{border-color:rgba(245,66,66,0.4);color:var(--danger);}
+
+.container{max-width:1280px;margin:0 auto;padding:40px;}
+.section-title{font-family:'DM Serif Display',serif;font-size:13px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;}
+
+.config-banner{background:rgba(201,245,66,0.06);border:1px solid rgba(201,245,66,0.2);border-radius:12px;padding:18px 22px;margin-bottom:28px;display:flex;align-items:flex-start;gap:14px;}
+.config-banner .c-icon{font-size:20px;}
+.config-banner .c-title{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:4px;}
+.config-banner .c-desc{font-size:12px;color:var(--muted);line-height:1.7;}
+.config-banner code{background:var(--surface2);border:1px solid var(--border);padding:1px 6px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent2);}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:0.4;}
+.stat-card.warn::before{background:var(--warn);}
+.stat-card.danger::before{background:var(--danger);}
+.stat-card.ok::before{background:var(--success);}
+.stat-label{font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:500;letter-spacing:0.5px;}
+.stat-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:500;}
+
+/* ── OCCUPANCY CALENDAR ── */
+.calendar-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px;}
+.calendar-inner{overflow-x:auto;}
+.cal-table{width:100%;border-collapse:collapse;min-width:680px;}
+.cal-table th,.cal-table td{border:none;}
+.cal-th-apt{padding:10px 16px;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:500;background:var(--surface2);border-right:1px solid var(--border);width:110px;min-width:110px;text-align:left;}
+.cal-th-day{padding:10px 6px;font-size:11px;text-align:center;color:var(--muted);font-family:'DM Mono',monospace;border-right:1px solid rgba(42,42,42,0.4);border-bottom:1px solid var(--border);}
+.cal-th-day.today{color:var(--accent);font-weight:700;}
+.cal-th-apt{border-bottom:1px solid var(--border);}
+.cal-td-apt{padding:0 14px;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2);background:var(--surface2);border-right:1px solid var(--border);border-bottom:1px solid rgba(42,42,42,0.35);height:48px;white-space:nowrap;}
+.cal-td-day{height:48px;border-right:1px solid rgba(42,42,42,0.3);border-bottom:1px solid rgba(42,42,42,0.35);padding:0;}
+.cal-td-day.today-col{background:rgba(201,245,66,0.03);}
+.cal-td-bar{height:48px;border-right:1px solid rgba(42,42,42,0.3);border-bottom:1px solid rgba(42,42,42,0.35);padding:6px 4px;vertical-align:middle;}
+.cal-bar{display:flex;align-items:center;height:100%;border-radius:6px;padding:0 10px;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default;transition:opacity 0.2s;}
+.cal-bar:hover{opacity:0.8;}
+.cal-bar.arriving{background:rgba(201,245,66,0.2);color:var(--accent);border:1px solid rgba(201,245,66,0.35);}
+.cal-bar.future{background:rgba(66,245,201,0.12);color:var(--accent2);border:1px solid rgba(66,245,201,0.25);}
+.cal-bar.conflict{background:rgba(245,164,66,0.2);color:var(--warn);border:1px solid rgba(245,164,66,0.4);}
+.cal-bar.mismatch{background:rgba(245,66,66,0.18);color:var(--danger);border:1px solid rgba(245,66,66,0.3);}
+.cal-empty{padding:24px;text-align:center;font-size:12px;color:var(--muted);font-style:italic;}
+
+.main-grid{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+.panel-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.panel-title{font-size:15px;font-weight:600;}
+.btn-row{display:flex;gap:10px;align-items:center;}
+
+.run-btn{background:var(--accent);color:#000;border:none;padding:10px 22px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:8px;}
+.run-btn:hover{background:#d4ff4a;transform:translateY(-1px);box-shadow:0 4px 20px rgba(201,245,66,0.3);}
+.run-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.reset-btn{background:transparent;color:var(--muted);border:1px solid var(--border);padding:10px 16px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all 0.2s;}
+.reset-btn:hover{border-color:var(--muted);color:var(--text);}
+.reset-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.reload-btn{background:transparent;color:var(--accent2);border:1px solid rgba(66,245,201,0.3);padding:10px 16px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all 0.2s;}
+.reload-btn:hover{background:rgba(66,245,201,0.08);}
+
+table{width:100%;border-collapse:collapse;}
+thead tr{border-bottom:1px solid var(--border);}
+th{padding:12px 20px;text-align:left;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:500;}
+td{padding:14px 20px;font-size:13px;border-bottom:1px solid rgba(42,42,42,0.5);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr.highlight td{background:rgba(201,245,66,0.03);}
+tr{transition:background 0.2s;}
+tr:hover td{background:rgba(255,255,255,0.02);}
+.apt-tag{font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:6px;color:var(--accent2);}
+.status-pill{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600;letter-spacing:0.5px;white-space:nowrap;display:inline-block;}
+.status-pill.arriving{background:rgba(201,245,66,0.15);color:var(--accent);}
+.status-pill.future{background:rgba(122,122,122,0.15);color:var(--muted);}
+.status-pill.sent{background:rgba(66,245,164,0.15);color:var(--success);}
+.status-pill.error{background:rgba(245,66,66,0.15);color:var(--danger);}
+.code-cell{font-family:'DM Mono',monospace;font-size:13px;color:var(--warn);letter-spacing:2px;}
+.code-cell.hidden{filter:blur(5px);transition:filter 0.3s;}
+tr:hover .code-cell.hidden{filter:blur(0);}
+.action-cell{display:flex;align-items:center;gap:8px;}
+.resolve-btn{background:rgba(245,164,66,0.15);color:var(--warn);border:1px solid rgba(245,164,66,0.35);padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.resolve-btn:hover{background:rgba(245,164,66,0.3);}
+.loading-row td{text-align:center;padding:40px;color:var(--muted);font-size:13px;}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin-right:8px;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.mismatch-banner{background:rgba(245,66,66,0.07);border:1px solid rgba(245,66,66,0.25);border-radius:12px;padding:18px 22px;display:none;align-items:flex-start;gap:14px;margin-bottom:24px;}
+.mismatch-banner.show{display:flex;animation:fadeIn 0.4s ease;}
+.m-icon{font-size:22px;}
+.m-title{font-size:13px;font-weight:700;color:var(--danger);margin-bottom:5px;}
+.m-desc{font-size:12px;color:var(--muted);line-height:1.7;}
+.fix-btn{margin-top:12px;background:var(--danger);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s;}
+.fix-btn:hover{background:#ff5555;}
+
+.right-col{display:flex;flex-direction:column;gap:16px;}
+.log-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;max-height:340px;display:flex;flex-direction:column;}
+.log-body{overflow-y:auto;flex:1;padding:16px;display:flex;flex-direction:column;gap:8px;}
+.log-entry{font-family:'DM Mono',monospace;font-size:11px;line-height:1.5;padding:8px 12px;border-radius:8px;border-left:3px solid var(--border);background:var(--surface2);opacity:0;transform:translateY(4px);transition:all 0.3s;}
+.log-entry.show{opacity:1;transform:translateY(0);}
+.log-entry.info{border-color:var(--accent2);}
+.log-entry.success{border-color:var(--success);}
+.log-entry.error{border-color:var(--danger);}
+.log-entry.warn{border-color:var(--warn);}
+.log-time{color:var(--muted);}
+
+.email-preview{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+.email-header{padding:16px 20px;border-bottom:1px solid var(--border);}
+.email-meta{font-size:11px;color:var(--muted);margin-bottom:4px;}
+.email-subject{font-size:14px;font-weight:600;}
+.email-body{padding:20px;font-size:13px;line-height:1.8;color:#ccc;}
+.email-body .hi{font-family:'DM Serif Display',serif;font-size:18px;color:var(--text);margin-bottom:12px;}
+.code-block{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 20px;text-align:center;margin:16px 0;}
+.code-block .code-label{font-size:11px;color:var(--muted);margin-bottom:8px;letter-spacing:1px;}
+.code-block .the-code{font-family:'DM Mono',monospace;font-size:26px;color:var(--accent);letter-spacing:6px;font-weight:500;}
+.placeholder-text{color:var(--muted);font-style:italic;text-align:center;padding:30px 20px;font-size:13px;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.3s;}
+.modal-overlay.show{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;width:480px;padding:32px;transform:translateY(20px);transition:transform 0.3s;max-height:90vh;overflow-y:auto;}
+.modal-overlay.show .modal{transform:translateY(0);}
+.resolve-modal{background:var(--surface);border:1px solid rgba(245,164,66,0.3);border-radius:20px;width:480px;padding:32px;transform:translateY(20px);transition:transform 0.3s;}
+.modal-overlay.show .resolve-modal{transform:translateY(0);}
+.modal-icon{font-size:36px;margin-bottom:16px;}
+.modal-title{font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:8px;}
+.modal-desc{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:24px;}
+.modal-checks{display:flex;flex-direction:column;gap:10px;margin-bottom:28px;}
+.check-row{display:flex;align-items:center;gap:12px;font-size:13px;padding:10px 14px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);}
+.check-row .check-icon{font-size:16px;width:24px;text-align:center;}
+.check-row.pass{border-color:rgba(66,245,164,0.3);}
+.check-row.fail{border-color:rgba(245,66,66,0.3);}
+.modal-actions{display:flex;gap:12px;}
+.btn-confirm{flex:1;background:var(--accent);color:#000;border:none;padding:12px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;}
+.btn-confirm:hover{background:#d4ff4a;}
+.btn-cancel{flex:1;background:transparent;color:var(--muted);border:1px solid var(--border);padding:12px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;transition:all 0.2s;}
+.btn-cancel:hover{border-color:var(--danger);color:var(--danger);}
+.info-row{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.9;}
+.info-row strong{color:var(--text);}
+.input-label{font-size:12px;color:var(--muted);margin-bottom:8px;display:block;letter-spacing:0.5px;font-weight:500;}
+.code-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-family:'DM Mono',monospace;font-size:22px;color:var(--accent);letter-spacing:6px;text-align:center;outline:none;transition:border 0.2s;margin-bottom:20px;}
+.code-input:focus{border-color:var(--warn);}
+.btn-resolve{width:100%;background:var(--warn);color:#000;border:none;padding:13px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;margin-bottom:10px;}
+.btn-resolve:hover{background:#ffb347;}
+.btn-cancel-full{width:100%;background:transparent;color:var(--muted);border:1px solid var(--border);padding:12px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;transition:all 0.2s;}
+.btn-cancel-full:hover{border-color:var(--danger);color:var(--danger);}
+
+.progress-wrap{height:3px;background:var(--surface2);overflow:hidden;}
+.progress-bar{height:100%;background:var(--accent);width:0%;transition:width 0.4s ease;}
+.toast{position:fixed;bottom:30px;right:30px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 20px;font-size:13px;display:flex;align-items:center;gap:10px;transform:translateY(20px);opacity:0;transition:all 0.3s;z-index:300;max-width:340px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.success{border-color:rgba(66,245,164,0.4);}
+.toast.error{border-color:rgba(245,66,66,0.4);}
+.toast.warn{border-color:rgba(245,164,66,0.4);}
+/* ── ADMIN PANEL ── */
+.admin-fab{position:fixed;bottom:30px;left:30px;background:var(--accent);border:none;color:#000;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;z-index:400;transition:all 0.2s;box-shadow:0 4px 24px rgba(201,245,66,0.4);}
+.admin-fab:hover{background:#d4ff4a;transform:scale(1.08);}
+.admin-drawer{position:fixed;left:0;top:0;bottom:0;width:500px;background:var(--surface);border-right:1px solid var(--border);z-index:500;transform:translateX(-100%);transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;box-shadow:8px 0 40px rgba(0,0,0,0.6);}
+.admin-drawer.open{transform:translateX(0);}
+.admin-drawer-header{padding:22px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.admin-drawer-title{font-family:'DM Serif Display',serif;font-size:20px;}
+.admin-close{background:transparent;border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+.admin-close:hover{border-color:var(--danger);color:var(--danger);}
+.admin-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.admin-tab{flex:1;padding:12px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:all 0.2s;letter-spacing:1px;text-transform:uppercase;}
+.admin-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.admin-body{flex:1;overflow-y:auto;padding:22px;}
+.form-group{margin-bottom:16px;}
+.form-label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.8px;display:block;margin-bottom:7px;text-transform:uppercase;}
+.form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border 0.2s;}
+.form-input:focus{border-color:var(--accent2);}
+.form-select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;cursor:pointer;appearance:none;transition:border 0.2s;}
+.form-select:focus{border-color:var(--accent2);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-error{font-size:12px;color:var(--danger);margin-top:12px;padding:12px 14px;background:rgba(245,66,66,0.08);border-radius:8px;border:1px solid rgba(245,66,66,0.2);display:none;line-height:1.6;}
+.form-error.show{display:block;}
+.btn-submit{width:100%;background:var(--accent);color:#000;border:none;padding:13px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;margin-top:8px;}
+.btn-submit:hover{background:#d4ff4a;}
+.btn-submit:disabled{opacity:0.4;cursor:not-allowed;}
+/* Available rooms suggestion */
+.avail-section{margin-top:14px;display:none;}
+.avail-section.show{display:block;}
+.avail-title{font-size:11px;color:var(--success);font-weight:700;letter-spacing:1px;margin-bottom:10px;text-transform:uppercase;}
+.avail-list{display:flex;flex-direction:column;gap:8px;}
+.avail-item{background:rgba(66,245,164,0.06);border:1px solid rgba(66,245,164,0.2);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;}
+.avail-item-info{font-size:12px;}
+.avail-item-id{font-family:'DM Mono',monospace;color:var(--accent2);font-size:12px;font-weight:600;}
+.avail-item-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.btn-use-room{background:var(--success);color:#000;border:none;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s;white-space:nowrap;}
+.btn-use-room:hover{background:#5fffb8;}
+/* Manage list */
+.admin-list{display:flex;flex-direction:column;gap:10px;}
+.admin-list-item{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.ali-name{font-size:13px;font-weight:600;margin-bottom:4px;}
+.ali-meta{font-size:11px;color:var(--muted);line-height:1.8;font-family:'DM Mono',monospace;}
+.ali-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.btn-edit{background:rgba(66,245,201,0.1);color:var(--accent2);border:1px solid rgba(66,245,201,0.25);padding:5px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;}
+.btn-edit:hover{background:rgba(66,245,201,0.2);}
+.btn-delete{background:rgba(245,66,66,0.1);color:var(--danger);border:1px solid rgba(245,66,66,0.25);padding:5px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;}
+.btn-delete:hover{background:rgba(245,66,66,0.2);}
+.btn-status{background:rgba(201,245,66,0.1);color:var(--accent);border:1px solid rgba(201,245,66,0.25);padding:5px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;}
+.btn-status:hover{background:rgba(201,245,66,0.2);}
+.section-divider{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:700;margin:20px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+/* Rooms list in admin */
+.room-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;}
+.room-item-id{font-family:'DM Mono',monospace;color:var(--accent2);font-size:12px;font-weight:600;}
+.room-item-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:490;opacity:0;pointer-events:none;transition:opacity 0.3s;}
+.drawer-overlay.show{opacity:1;pointer-events:all;}
+.no-script-warn{background:rgba(245,164,66,0.08);border:1px solid rgba(245,164,66,0.25);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--warn);margin-bottom:16px;line-height:1.6;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.pulsing{animation:pulse 1.5s infinite;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Stay<span>Sync</span><span style="font-size:12px;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:300;margin-left:8px;">Reservation Automation</span></div>
+  <div class="header-right">
+    <span class="sheets-status" id="sheetsStatus">&#9679; Sheets: not connected</span>
+    <span class="badge">DEMO</span>
+  </div>
+</header>
+
+<div class="container">
+  <div class="config-banner" id="configBanner">
+    <div class="c-icon">&#9881;&#65039;</div>
+    <div>
+      <div class="c-title">Setup Required — fill in your 4 keys in the CONFIG block</div>
+      <div class="c-desc"><code>SHEETS_ID</code> &nbsp;|&nbsp; <code>EMAILJS_PUBLIC_KEY</code> &nbsp;|&nbsp; <code>EMAILJS_SERVICE_ID</code> &nbsp;|&nbsp; <code>EMAILJS_TEMPLATE_ID</code> &nbsp;&mdash; see SETUP-GUIDE.txt for instructions.</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card warn"><div class="stat-label">Arriving Today</div><div class="stat-value" id="s-arriving">—</div></div>
+    <div class="stat-card"><div class="stat-label">Upcoming (7 days)</div><div class="stat-value" id="s-upcoming">—</div></div>
+    <div class="stat-card ok"><div class="stat-label">Codes Sent Today</div><div class="stat-value" id="s-sent">0</div></div>
+    <div class="stat-card danger"><div class="stat-label">Mismatches Caught</div><div class="stat-value" id="s-errors">0</div></div>
+  </div>
+
+  <!-- OCCUPANCY CALENDAR -->
+  <p class="section-title">Weekly Occupancy</p>
+  <div class="calendar-panel">
+    <div class="panel-header" style="padding:14px 20px;">
+      <span class="panel-title" style="font-size:13px;" id="cal-week-label">This Week</span>
+      <span style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;">Hover bars to see guest name</span>
+    </div>
+    <div class="calendar-inner">
+      <div id="calGrid"><div class="cal-empty">Loading calendar...</div></div>
+    </div>
+  </div>
+
+  <div class="mismatch-banner" id="mismatchBanner">
+    <div class="m-icon">&#9888;&#65039;</div>
+    <div>
+      <div class="m-title">Mismatch Detected &mdash; Action Required</div>
+      <div class="m-desc">Guest <strong id="bannerGuest"></strong> is booked for <strong id="bannerApt"></strong>, but the door code belongs to a different apartment. Code was <strong style="color:var(--danger)">NOT sent</strong>.</div>
+      <button class="fix-btn" onclick="openResolveModal()">&#128295; Fix &amp; Send Correct Code</button>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div>
+      <p class="section-title">Today's Reservations</p>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Check-ins &mdash; <span style="color:var(--muted);font-weight:400" id="today-date"></span></span>
+          <div class="btn-row">
+            <button class="reload-btn" onclick="loadFromSheets()">&#8635; Reload</button>
+            <button class="reset-btn" id="resetBtn" onclick="resetDemo()" disabled>&#8634; Reset</button>
+            <button class="run-btn" id="runBtn" onclick="startAutomation()" disabled>&#9654; Run Automation</button>
+          </div>
+        </div>
+        <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+        <table>
+          <thead><tr><th>Guest</th><th>Apartment</th><th>Nights</th><th>Door Code</th><th>Status</th></tr></thead>
+          <tbody id="reservationTable"><tr class="loading-row"><td colspan="5"><span class="spinner"></span>Loading from Google Sheets...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="right-col">
+      <p class="section-title">Automation Log</p>
+      <div class="log-panel">
+        <div class="panel-header" style="padding:14px 20px">
+          <span class="panel-title" style="font-size:13px">Live Output</span>
+          <span id="log-status" style="font-size:11px;color:var(--muted)">Idle</span>
+        </div>
+        <div class="log-body" id="logBody">
+          <div style="color:var(--muted);font-size:12px;font-family:'DM Mono',monospace;padding:8px;">// Waiting for automation to run...</div>
+        </div>
+      </div>
+      <p class="section-title" style="margin-top:8px">Email Preview</p>
+      <div class="email-preview" id="emailPreview">
+        <div class="placeholder-text">Run the automation to preview the guest email</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VALIDATION MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-icon">&#128272;</div>
+    <div class="modal-title" id="modalTitle">Validating reservation</div>
+    <div class="modal-desc" id="modalDesc">Checking door code matches apartment before sending.</div>
+    <div class="modal-checks" id="modalChecks"></div>
+    <div class="modal-actions">
+      <button class="btn-confirm" onclick="confirmSend()">&#10003; Confirm &amp; Send</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESOLVE MODAL -->
+<div class="modal-overlay" id="resolveOverlay">
+  <div class="resolve-modal">
+    <div class="modal-icon">&#128295;</div>
+    <div class="modal-title">Resolve Mismatch</div>
+    <div class="modal-desc">Enter the correct door code for this apartment to fix and send.</div>
+    <div class="info-row" id="resolveInfo"></div>
+    <label class="input-label">CORRECT DOOR CODE FOR <span id="resolveAptLabel" style="color:var(--accent2)"></span></label>
+    <input class="code-input" id="codeInput" type="text" maxlength="6" placeholder="0000" oninput="this.value=this.value.replace(/[^0-9]/g,'')"/>
+    <button class="btn-resolve" onclick="resolveAndSend()">&#10003; Fix &amp; Send Code Now</button>
+    <button class="btn-cancel-full" onclick="closeResolveModal()">Cancel</button>
+  </div>
+</div>
+<!-- ADMIN FAB -->
+<button class="admin-fab" onclick="openAdmin()" title="Admin Panel">&#9881;</button>
+
+<!-- DRAWER OVERLAY -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeAdmin()"></div>
+
+<!-- ADMIN DRAWER -->
+<div class="admin-drawer" id="adminDrawer">
+  <div class="admin-drawer-header">
+    <span class="admin-drawer-title">Admin Panel</span>
+    <button class="admin-close" onclick="closeAdmin()">&#10005;</button>
+  </div>
+  <div class="admin-tabs">
+    <div class="admin-tab active" id="tab-add"   onclick="switchTab('add')">ADD</div>
+    <div class="admin-tab"        id="tab-list"  onclick="switchTab('list')">RESERVATIONS</div>
+    <div class="admin-tab"        id="tab-rooms" onclick="switchTab('rooms')">ROOMS</div>
+  </div>
+  <div class="admin-body">
+
+    <!-- ── ADD / EDIT RESERVATION ── -->
+    <div id="panel-add">
+      <div id="noScriptWarn" class="no-script-warn" style="display:none">
+        &#9888; Apps Script URL not configured — changes won&#39;t be saved to Sheets.
+      </div>
+      <input type="hidden" id="editRow"/>
+
+      <!-- STEP 1: Dates first -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Check-in Date</label>
+          <input class="form-input" id="f-checkin" type="date" onchange="onDatesChange()"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Check-out Date</label>
+          <input class="form-input" id="f-checkout" type="date" onchange="onDatesChange()"/>
+        </div>
+      </div>
+
+      <!-- STEP 2: Room dropdown — only enabled after dates selected -->
+      <div class="form-group">
+        <label class="form-label">
+          Apartment
+          <span id="aptHint" style="color:var(--muted);font-weight:400;margin-left:6px;text-transform:none;letter-spacing:0;">(select dates first)</span>
+        </label>
+        <select class="form-select" id="f-apt" disabled onchange="clearAvailability()" style="opacity:0.5;cursor:not-allowed;">
+          <option value="">— select dates to see available rooms —</option>
+        </select>
+      </div>
+
+      <!-- STEP 3: Rest of form -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Guest Name</label>
+          <input class="form-input" id="f-name" placeholder="John Smith"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" id="f-email" type="email" placeholder="john@example.com"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Door Code</label>
+          <input class="form-input" id="f-code" placeholder="4821" maxlength="6"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="f-status">
+            <option value="future">Upcoming</option>
+            <option value="arriving">Arriving Today</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Code Valid?</label>
+        <select class="form-select" id="f-valid">
+          <option value="true">Yes — code matches apt</option>
+          <option value="false">No — simulate mismatch</option>
+        </select>
+      </div>
+
+      <div class="form-error" id="formError"></div>
+
+      <!-- Available rooms suggestion (shown after conflict) -->
+      <div class="avail-section" id="availSection">
+        <div class="avail-title">&#10003; Available rooms for those dates</div>
+        <div class="avail-list" id="availList"></div>
+      </div>
+
+      <button class="btn-submit" id="submitBtn" onclick="submitForm()">&#43; Add Reservation</button>
+      <button class="btn-cancel-full" id="cancelEditBtn" style="display:none;margin-top:8px" onclick="cancelEdit()">Cancel Edit</button>
+    </div>
+
+    <!-- ── MANAGE RESERVATIONS ── -->
+    <div id="panel-list" style="display:none">
+      <div class="admin-list" id="adminList"></div>
+    </div>
+
+    <!-- ── MANAGE ROOMS ── -->
+    <div id="panel-rooms" style="display:none">
+      <div class="section-divider">Add New Room</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Room ID</label>
+          <input class="form-input" id="r-id" placeholder="APT-06F"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Name / Description</label>
+          <input class="form-input" id="r-name" placeholder="Suite 6F"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Capacity (guests)</label>
+          <input class="form-input" id="r-capacity" type="number" placeholder="2" min="1"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Floor</label>
+          <input class="form-input" id="r-floor" placeholder="6"/>
+        </div>
+      </div>
+      <div class="form-error" id="roomError"></div>
+      <button class="btn-submit" onclick="submitRoom()">&#43; Add Room</button>
+      <div class="section-divider" style="margin-top:24px">Current Rooms</div>
+      <div class="admin-list" id="roomsList"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  CONFIGURATION — Replace with your own values
+// ═══════════════════════════════════════════════════
+const CONFIG = {
+  SHEETS_ID:           '1K4dPMg8zhcWCHGM-f6VZ1VQUT9igIa7v85ChMwE0E4I',
+  APPS_SCRIPT_URL:     'https://script.google.com/macros/s/AKfycbw73lGyqoheJSUL4M1YZX7UyHI6Fqu4UJhFdOUM5e-Ggnqr4V_66kJvz6RcJSkrGJdv/exec',
+  EMAILJS_PUBLIC_KEY:  'vm9DTEAlgXMMYOQYF',
+  EMAILJS_SERVICE_ID:  'service_5ru8wwp',
+  EMAILJS_TEMPLATE_ID: 'template_szn2sru',
+};
+// ═══════════════════════════════════════════════════
+
+const IS_CONFIGURED = !Object.values(CONFIG).some(v=>v.startsWith('YOUR_'));
+const HAS_SCRIPT = CONFIG.APPS_SCRIPT_URL && !CONFIG.APPS_SCRIPT_URL.startsWith('YOUR_');
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+
+document.getElementById('today-date').textContent = TODAY.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+if(IS_CONFIGURED){
+  emailjs.init(CONFIG.EMAILJS_PUBLIC_KEY);
+  document.getElementById('configBanner').style.display='none';
+}
+
+let reservations=[], originalReservations=[];
+let currentReservation=null, currentResolve=null;
+let sentCount=0, errorCount=0;
+
+// ── PARSE DATE ───────────────────────────────────────
+// Accepts "2026-03-17", "17/03/2026", "03/17/2026"
+function parseDate(str){
+  if(!str) return null;
+  str=String(str).trim();
+  // Google Sheets gviz returns dates as "Date(2026,2,21)" — month is 0-indexed
+  const gviz=str.match(/^Date\((\d+),(\d+),(\d+)\)$/);
+  if(gviz) return new Date(parseInt(gviz[1]),parseInt(gviz[2]),parseInt(gviz[3]));
+  // ISO format: 2026-03-21
+  if(/^\d{4}-\d{2}-\d{2}$/.test(str)){const[y,m,d]=str.split('-').map(Number);return new Date(y,m-1,d);}
+  // DD/MM/YYYY
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(str)){const[d,m,y]=str.split('/').map(Number);return new Date(y,m-1,d);}
+  // fallback
+  const d=new Date(str);
+  if(!isNaN(d)){d.setHours(0,0,0,0);return d;}
+  return null;
+}
+
+// ── GOOGLE SHEETS LOADER ─────────────────────────────
+// Columns: A:name B:email C:apartment D:code_apartment E:door_code F:nights G:status H:valid I:checkin_date
+async function loadFromSheets(){
+  if(!IS_CONFIGURED){loadFallbackData();return;}
+  document.getElementById('reservationTable').innerHTML='<tr class="loading-row"><td colspan="5"><span class="spinner"></span>Loading from Google Sheets...</td></tr>';
+  document.getElementById('runBtn').disabled=true;
+  updateSheetsStatus('loading');
+  try{
+    // If Apps Script configured, use it (gets both reservations + rooms in one call)
+    if(HAS_SCRIPT){
+      const res=await fetch(CONFIG.APPS_SCRIPT_URL+'?action=all',{redirect:'follow'});
+      const text=await res.text();
+      console.log('StaySync response:',res.status, text.substring(0,200));
+      const json=JSON.parse(text);
+      if(!json.success) throw new Error(json.error||'success:false');
+      reservations=json.reservations.map((r,i)=>({
+        ...r, id:i+1,
+        checkin:  r.checkin_date  ? parseDate(r.checkin_date)  : null,
+        checkout: r.checkout_date ? parseDate(r.checkout_date) : null,
+        apt:      r.apartment,
+        aptCode:  r.code_apartment||r.apartment,
+        code:     r.door_code,
+        nights:   parseInt(r.nights)||1,
+        valid:    String(r.valid).toLowerCase()==='true'||r.valid===true,
+        status:   String(r.status).toLowerCase()||'future',
+      }));
+      rooms=json.rooms||[];
+    } else {
+      // Fallback: read-only via gviz
+      const url=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEETS_ID}/gviz/tq?tqx=out:json&sheet=Reservations`;
+      const res=await fetch(url);
+      const text=await res.text();
+      const json=JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
+      const rows=json.table.rows;
+      // DEBUG
+      if(rows.length>0){
+        const c=rows[0].c;
+        console.log('DEBUG row 0 raw cells:');
+        c.forEach((cell,i)=>console.log(`  col ${i}:`,JSON.stringify(cell)));
+      }
+      reservations=rows.map((row,i)=>{
+        const c=row.c;
+        const val=(idx)=>{
+          if(!c[idx]||c[idx].v===null) return '';
+          if(typeof c[idx].v==='string'&&c[idx].v.startsWith('Date(')) return c[idx].v;
+          return String(c[idx].v).trim();
+        };
+        const checkin=parseDate(val(8));
+        const checkoutRaw=val(9);
+        const checkout=parseDate(checkoutRaw);
+        const nightsRaw=parseInt(val(5))||1;
+        let nights=nightsRaw;
+        if(checkin&&checkout){
+          const d=Math.round((checkout.getTime()-checkin.getTime())/86400000);
+          if(d>0) nights=d;
+        }
+        return{
+          id:i+1,_row:i+2,
+          name:val(0),email:val(1),apt:val(2),aptCode:val(3),
+          code:val(4),nights,
+          status:val(6).toLowerCase()||'future',
+          valid:val(7).toLowerCase()==='true'||val(7)==='1',
+          checkin,checkout,
+        };
+      }).filter(r=>r.name);
+      // Try to also load rooms via gviz
+      try{
+        const rUrl=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEETS_ID}/gviz/tq?tqx=out:json&sheet=Rooms`;
+        const rRes=await fetch(rUrl);
+        const rText=await rRes.text();
+        const rJson=JSON.parse(rText.substring(rText.indexOf('{'),rText.lastIndexOf('}')+1));
+        rooms=rJson.table.rows.map((row,i)=>{
+          const c=row.c;
+          const v=(idx)=>c[idx]&&c[idx].v!==null?String(c[idx].v).trim():'';
+          return{_row:i+2,room_id:v(0),name:v(1),capacity:v(2),floor:v(3),active:v(4)};
+        }).filter(r=>r.room_id&&r.active.toLowerCase()!=='false');
+      }catch(e){ rooms=[]; }
+    }
+    originalReservations=JSON.parse(JSON.stringify(reservations.map(r=>({...r,checkin:r.checkin?r.checkin.toISOString():null,checkout:r.checkout?r.checkout.toISOString():null}))));
+    updateStats();renderTable();renderCalendar();
+    updateSheetsStatus('connected');
+    showToast(`Loaded ${reservations.length} reservations, ${rooms.length} rooms`,'success');
+    document.getElementById('runBtn').disabled=false;
+  }catch(e){
+    updateSheetsStatus('error');
+    showToast('Could not load Sheets — using demo data','warn');
+    loadFallbackData();
+  }
+}
+
+function updateSheetsStatus(state){
+  const el=document.getElementById('sheetsStatus');
+  if(state==='connected'){el.textContent='● Sheets: connected';el.className='sheets-status connected';}
+  else if(state==='error'){el.textContent='● Sheets: error';el.className='sheets-status error';}
+  else if(state==='loading'){el.textContent='○ Sheets: loading…';el.className='sheets-status';}
+  else{el.textContent='○ Sheets: demo mode';el.className='sheets-status';}
+}
+
+function loadFallbackData(){
+  const t=new Date(TODAY);
+  reservations=[
+    {id:1,name:'Sofia Martínez', email:'sofia.m@email.com', apt:'APT-04A',aptCode:'APT-04A',code:'7842',nights:3,status:'arriving',valid:true, checkin:new Date(t), checkout:new Date(t.getTime()+3*86400000)},
+    {id:2,name:"James O'Brien",  email:'jobrien@mail.com',  apt:'APT-11B',aptCode:'APT-11B',code:'3391',nights:7,status:'arriving',valid:true, checkin:new Date(t), checkout:new Date(t.getTime()+7*86400000)},
+    {id:3,name:'Yuki Tanaka',    email:'yuki.t@domain.jp', apt:'APT-07C',aptCode:'APT-04A',code:'5510',nights:2,status:'arriving',valid:false,checkin:new Date(t), checkout:new Date(t.getTime()+2*86400000)},
+    {id:4,name:'Carlos Reyes',   email:'c.reyes@inbox.mx', apt:'APT-02D',aptCode:'APT-02D',code:'9923',nights:5,status:'future',  valid:true, checkin:new Date(t.getTime()+2*86400000), checkout:new Date(t.getTime()+7*86400000)},
+    {id:5,name:'Amina Hassan',   email:'ahassan@post.net', apt:'APT-15E',aptCode:'APT-15E',code:'6671',nights:4,status:'future',  valid:true, checkin:new Date(t.getTime()+1*86400000), checkout:new Date(t.getTime()+5*86400000)},
+  ];
+  rooms=[
+    {_row:2,room_id:'APT-04A',name:'Suite 4A',   capacity:'2',floor:'4', active:'true'},
+    {_row:3,room_id:'APT-11B',name:'Studio 11B', capacity:'1',floor:'11',active:'true'},
+    {_row:4,room_id:'APT-07C',name:'Suite 7C',   capacity:'2',floor:'7', active:'true'},
+    {_row:5,room_id:'APT-02D',name:'Studio 2D',  capacity:'1',floor:'2', active:'true'},
+    {_row:6,room_id:'APT-15E',name:'Loft 15E',   capacity:'3',floor:'15',active:'true'},
+  ];
+  originalReservations=JSON.parse(JSON.stringify(reservations.map(r=>({...r,checkin:r.checkin?r.checkin.toISOString():null,checkout:r.checkout?r.checkout.toISOString():null}))));
+  updateStats();renderTable();renderCalendar();
+  updateSheetsStatus('demo');
+  document.getElementById('runBtn').disabled=false;
+}
+
+function updateStats(){
+  document.getElementById('s-arriving').textContent=reservations.filter(r=>r.status==='arriving').length;
+  document.getElementById('s-upcoming').textContent=reservations.filter(r=>r.status==='future').length;
+}
+
+// ── OCCUPANCY CALENDAR ───────────────────────────────
+function renderCalendar(){
+  const wrap=document.getElementById('calGrid');
+  if(!reservations.length){wrap.innerHTML='<div class="cal-empty">No reservations to display.</div>';return;}
+
+  const DAY_MS=86400000;
+  const days=[];
+  for(let i=0;i<7;i++) days.push(new Date(TODAY.getTime()+i*DAY_MS));
+
+  const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MON_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const last=days[6];
+  document.getElementById('cal-week-label').textContent=
+    `${DAY_NAMES[days[0].getDay()]} ${MON_NAMES[days[0].getMonth()]} ${days[0].getDate()} — `+
+    `${DAY_NAMES[last.getDay()]} ${MON_NAMES[last.getMonth()]} ${last.getDate()}`;
+
+  const winStart=days[0];
+  const winEnd=new Date(days[6].getTime()+DAY_MS);
+  const apts=[...new Set(reservations.map(r=>r.apt))];
+
+  // Normalize dates for all reservations
+  const norm=reservations.filter(r=>r.checkin).map(r=>{
+    const ci=new Date(r.checkin); ci.setHours(0,0,0,0);
+    const co=r.checkout?new Date(r.checkout):new Date(ci.getTime()+r.nights*DAY_MS);
+    co.setHours(0,0,0,0);
+    return{...r,ci,co};
+  });
+
+  // Detect double-bookings: same apt, overlapping dates
+  const conflicts=new Set();
+  norm.forEach((a,i)=>{
+    norm.slice(i+1).forEach(b=>{
+      if(a.apt===b.apt && a.ci<b.co && b.ci<a.co){
+        conflicts.add(a.id); conflicts.add(b.id);
+      }
+    });
+  });
+
+  // Show/hide conflict banner
+  let conflictBanner=document.getElementById('conflictBanner');
+  if(!conflictBanner){
+    conflictBanner=document.createElement('div');
+    conflictBanner.id='conflictBanner';
+    conflictBanner.style.cssText='background:rgba(245,164,66,0.08);border:1px solid rgba(245,164,66,0.3);border-radius:12px;padding:14px 20px;margin-bottom:16px;font-size:12px;color:var(--warn);display:none;';
+    document.getElementById('calGrid').parentElement.parentElement.insertBefore(conflictBanner, document.getElementById('calGrid').parentElement);
+  }
+  if(conflicts.size>0){
+    const names=[...new Set(norm.filter(r=>conflicts.has(r.id)).map(r=>`${r.name} (${r.apt})`))].join(', ');
+    conflictBanner.innerHTML=`⚠️ <strong>Double-booking detected:</strong> ${names} — same apartment has overlapping dates. Please fix in Google Sheets.`;
+    conflictBanner.style.display='block';
+  } else {
+    conflictBanner.style.display='none';
+  }
+
+  // Build table
+  const table=document.createElement('table');
+  table.className='cal-table';
+
+  // Header
+  const thead=document.createElement('thead');
+  const hRow=document.createElement('tr');
+  const thApt=document.createElement('th');
+  thApt.className='cal-th-apt';
+  thApt.textContent='APARTMENT';
+  hRow.appendChild(thApt);
+  days.forEach(d=>{
+    const th=document.createElement('th');
+    th.className='cal-th-day'+(d.getTime()===TODAY.getTime()?' today':'');
+    th.innerHTML=`<div style="font-size:10px">${DAY_NAMES[d.getDay()]}</div><div style="font-size:14px;font-weight:600;color:var(--text);margin-top:2px">${d.getDate()}</div>`;
+    hRow.appendChild(th);
+  });
+  thead.appendChild(hRow);
+  table.appendChild(thead);
+
+  const tbody=document.createElement('tbody');
+
+  apts.forEach(apt=>{
+    // All reservations for this apt overlapping the window
+    const aptRes=norm.filter(r=>{
+      if(r.apt!==apt) return false;
+      return r.co>winStart && r.ci<winEnd;
+    }).sort((a,b)=>a.ci-b.ci);
+
+    if(!aptRes.length){
+      // Apt exists but nothing this week — one empty row
+      const tr=document.createElement('tr');
+      const tdApt=document.createElement('td');
+      tdApt.className='cal-td-apt';
+      tdApt.textContent=apt;
+      tr.appendChild(tdApt);
+      for(let i=0;i<7;i++){
+        const td=document.createElement('td');
+        td.className='cal-td-day'+(days[i].getTime()===TODAY.getTime()?' today-col':'');
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+      return;
+    }
+
+    // Pack reservations into lanes (sub-rows) so overlapping ones don't collide
+    const lanes=[];
+    aptRes.forEach(r=>{
+      let placed=false;
+      for(let l=0;l<lanes.length;l++){
+        const last=lanes[l][lanes[l].length-1];
+        if(r.ci>=last.co){lanes[l].push(r);placed=true;break;}
+      }
+      if(!placed) lanes.push([r]);
+    });
+
+    // One <tr> per lane; first lane shows apt label with rowspan
+    lanes.forEach((lane,laneIdx)=>{
+      const tr=document.createElement('tr');
+
+      if(laneIdx===0){
+        const tdApt=document.createElement('td');
+        tdApt.className='cal-td-apt';
+        tdApt.textContent=apt;
+        if(lanes.length>1) tdApt.rowSpan=lanes.length;
+        tr.appendChild(tdApt);
+      }
+
+      // Walk 7 days for this lane
+      let dayIdx=0;
+      while(dayIdx<7){
+        const currentDay=days[dayIdx];
+        const res=lane.find(r=>r.ci<=currentDay && r.co>currentDay);
+        if(res){
+          const barStart=res.ci<winStart?winStart:res.ci;
+          const barEnd=res.co>winEnd?winEnd:res.co;
+          const startIdx=days.findIndex(d=>d.getTime()===barStart.getTime());
+          const effectiveStart=Math.max(startIdx<0?0:startIdx,dayIdx);
+          const endIdx=days.findIndex(d=>d.getTime()===barEnd.getTime());
+          const effectiveEnd=endIdx===-1?7:endIdx;
+          const span=Math.max(1,effectiveEnd-effectiveStart);
+          const td=document.createElement('td');
+          td.className='cal-td-bar';
+          td.colSpan=span;
+          const isConflict=conflicts.has(res.id);
+          const bar=document.createElement('div');
+          bar.className='cal-bar '+(isConflict?'conflict':res.valid===false?'mismatch':res.status==='arriving'?'arriving':'future');
+          bar.title=`${res.name} · ${res.ci.toLocaleDateString()} → ${res.co.toLocaleDateString()} · ${res.nights}n`;
+          bar.textContent=res.name;
+          td.appendChild(bar);
+          tr.appendChild(td);
+          dayIdx+=span;
+        } else {
+          const td=document.createElement('td');
+          td.className='cal-td-day'+(currentDay.getTime()===TODAY.getTime()?' today-col':'');
+          tr.appendChild(td);
+          dayIdx++;
+        }
+      }
+      tbody.appendChild(tr);
+    });
+  });
+
+  table.appendChild(tbody);
+  wrap.innerHTML='';
+  wrap.appendChild(table);
+}
+
+// ── RENDER TABLE ─────────────────────────────────────
+function renderTable(){
+  const tbody=document.getElementById('reservationTable');
+  tbody.innerHTML='';
+  if(!reservations.length){
+    tbody.innerHTML='<tr class="loading-row"><td colspan="5" style="color:var(--muted)">No reservations found.</td></tr>';
+    return;
+  }
+  reservations.forEach(r=>{
+    const tr=document.createElement('tr');
+    if(r.status==='arriving') tr.classList.add('highlight');
+    const actionHTML=r.status==='error'
+      ?`<div class="action-cell"><span class="status-pill error">&#9888; Mismatch</span><button class="resolve-btn" onclick="openResolveModal()">Fix &amp; Send</button></div>`
+      :`<span class="status-pill ${r.status}" id="status-${r.id}">${statusLabel(r.status)}</span>`;
+    tr.innerHTML=`
+      <td><div style="font-weight:500">${r.name}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${r.email}</div></td>
+      <td><span class="apt-tag">${r.apt}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${r.nights}n</td>
+      <td><span class="code-cell hidden" id="code-${r.id}">${r.code}</span></td>
+      <td id="action-${r.id}">${actionHTML}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function statusLabel(s){return{arriving:'Arriving Today',future:'Upcoming',sent:'&#10003; Code Sent',error:'&#9888; Mismatch'}[s]||s;}
+
+function addLog(msg,type='info'){
+  const body=document.getElementById('logBody');
+  const time=new Date().toLocaleTimeString('en-US',{hour12:false});
+  const el=document.createElement('div');
+  el.className=`log-entry ${type}`;
+  el.innerHTML=`<span class="log-time">[${time}]</span> ${msg}`;
+  body.appendChild(el);
+  setTimeout(()=>el.classList.add('show'),50);
+  body.scrollTop=body.scrollHeight;
+}
+
+function showToast(msg,type='success'){
+  const t=document.getElementById('toast');
+  t.className=`toast ${type} show`;
+  t.innerHTML=(type==='success'?'&#9989;':type==='warn'?'&#128295;':'&#9888;&#65039;')+' '+msg;
+  setTimeout(()=>t.classList.remove('show'),3800);
+}
+
+function setProgress(pct){document.getElementById('progressBar').style.width=pct+'%';}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function updateStatus(id,status){
+  const r=reservations.find(x=>x.id===id);
+  if(r) r.status=status;
+  const cell=document.getElementById(`action-${id}`);
+  if(!cell) return;
+  cell.innerHTML=status==='error'
+    ?`<div class="action-cell"><span class="status-pill error">&#9888; Mismatch</span><button class="resolve-btn" onclick="openResolveModal()">Fix &amp; Send</button></div>`
+    :`<span class="status-pill ${status}" id="status-${id}">${statusLabel(status)}</span>`;
+}
+
+async function startAutomation(){
+  document.getElementById('runBtn').disabled=true;
+  document.getElementById('resetBtn').disabled=true;
+  document.getElementById('logBody').innerHTML='';
+  document.getElementById('log-status').textContent='Running...';
+  document.getElementById('log-status').classList.add('pulsing');
+  document.getElementById('mismatchBanner').classList.remove('show');
+  const queue=reservations.filter(r=>r.status==='arriving');
+  setProgress(5);
+  addLog('Automation triggered &mdash; scanning today\'s check-ins','info');
+  await sleep(600);
+  addLog(`Found <strong>${queue.length}</strong> guest${queue.length!==1?'s':''} arriving today`,'info');
+  await sleep(500);setProgress(15);
+  for(let i=0;i<queue.length;i++){
+    const r=queue[i];
+    await sleep(700);
+    addLog(`Processing: <strong>${r.name}</strong> &rarr; ${r.apt}`,'info');
+    await sleep(500);
+    if(!r.valid){
+      addLog(`&#9888; MISMATCH &mdash; code belongs to ${r.aptCode} but reservation is ${r.apt}`,'error');
+      errorCount++;document.getElementById('s-errors').textContent=errorCount;
+      updateStatus(r.id,'error');currentReservation=r;
+      document.getElementById('bannerGuest').textContent=r.name;
+      document.getElementById('bannerApt').textContent=r.apt;
+      document.getElementById('mismatchBanner').classList.add('show');
+      showToast(`Mismatch caught for ${r.name}`,'error');
+      setProgress(15+((i+1)/queue.length)*70);continue;
+    }
+    addLog(`&#10003; Validation passed &mdash; code matches ${r.apt}`,'success');
+    await sleep(400);
+    if(i===0){await showValidationModal(r);}
+    else{await sleep(500);await completeReservation(r);setProgress(15+((i+1)/queue.length)*70);}
+  }
+  await sleep(500);setProgress(100);
+  addLog(`Automation complete &mdash; ${sentCount} sent, ${errorCount} flagged`,sentCount>0?'success':'warn');
+  document.getElementById('log-status').textContent='Complete';
+  document.getElementById('log-status').classList.remove('pulsing');
+  document.getElementById('runBtn').disabled=false;
+  document.getElementById('resetBtn').disabled=false;
+}
+
+async function sendEmail(r){
+  if(!IS_CONFIGURED){addLog(`&#128231; [DEMO] Email simulated &rarr; ${r.email}`,'success');return true;}
+  try{
+    await emailjs.send(CONFIG.EMAILJS_SERVICE_ID,CONFIG.EMAILJS_TEMPLATE_ID,{
+      to_name:r.name.split(' ')[0],to_email:r.email,apartment:r.apt,door_code:r.code,nights:r.nights,full_name:r.name,
+    });
+    addLog(`&#128231; Email sent &rarr; ${r.email}`,'success');return true;
+  }catch(e){
+    addLog(`&#10060; Email failed: ${e.text||e}`,'error');
+    showToast(`Email failed for ${r.name}`,'error');return false;
+  }
+}
+
+async function completeReservation(r){
+  addLog(`&#128231; Sending email &rarr; ${r.email}`,'info');
+  const ok=await sendEmail(r);
+  if(ok){sentCount++;document.getElementById('s-sent').textContent=sentCount;updateStatus(r.id,'sent');showEmailPreview(r);}
+}
+
+function showValidationModal(r){
+  return new Promise(resolve=>{
+    currentReservation=r;currentResolve=resolve;
+    document.getElementById('modalTitle').textContent=`Send code to ${r.name}?`;
+    document.getElementById('modalDesc').textContent='Review all validation checks before dispatching the door code.';
+    const checks=[
+      {label:'Reservation found for today',pass:true},
+      {label:`Apartment ${r.apt} confirmed`,pass:true},
+      {label:`Code assigned to ${r.aptCode}`,pass:r.valid},
+      {label:'Code\u2013apartment match verified',pass:r.valid},
+      {label:`Email: ${r.email}`,pass:true},
+    ];
+    const container=document.getElementById('modalChecks');container.innerHTML='';
+    checks.forEach(c=>{const div=document.createElement('div');div.className=`check-row ${c.pass?'pass':'fail'}`;div.innerHTML=`<span class="check-icon">${c.pass?'&#9989;':'&#10060;'}</span> ${c.label}`;container.appendChild(div);});
+    document.getElementById('modalOverlay').classList.add('show');
+  });
+}
+
+async function confirmSend(){
+  closeModal();
+  if(currentReservation){await completeReservation(currentReservation);setProgress(60);}
+  if(currentResolve) currentResolve();
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
+
+function openResolveModal(){
+  const r=reservations.find(x=>x.status==='error')||currentReservation;
+  if(!r) return;
+  currentReservation=r;
+  document.getElementById('resolveInfo').innerHTML=`<strong>Guest:</strong> ${r.name}<br><strong>Apartment:</strong> ${r.apt}<br><strong>Email:</strong> ${r.email}<br><strong>Wrong code:</strong> <span style="color:var(--danger);font-family:'DM Mono',monospace;letter-spacing:2px">${r.code}</span> (belongs to ${r.aptCode})`;
+  document.getElementById('resolveAptLabel').textContent=r.apt;
+  document.getElementById('codeInput').value='';
+  document.getElementById('resolveOverlay').classList.add('show');
+}
+function closeResolveModal(){document.getElementById('resolveOverlay').classList.remove('show');}
+
+async function resolveAndSend(){
+  const newCode=document.getElementById('codeInput').value.trim();
+  if(newCode.length<4){showToast('Enter a valid 4\u20136 digit code','error');return;}
+  closeResolveModal();
+  const r=currentReservation;
+  r.code=newCode;r.valid=true;r.aptCode=r.apt;
+  const codeEl=document.getElementById(`code-${r.id}`);
+  if(codeEl) codeEl.textContent=newCode;
+  document.getElementById('mismatchBanner').classList.remove('show');
+  addLog(`&#128295; Mismatch resolved &mdash; new code for ${r.apt}`,'warn');
+  await sleep(500);
+  addLog(`&#10003; Re-validation passed`,'success');
+  await sleep(500);
+  await completeReservation(r);
+  errorCount=Math.max(0,errorCount-1);
+  document.getElementById('s-errors').textContent=errorCount;
+  showToast(`Code corrected and sent to ${r.name}`,'warn');
+}
+
+function showEmailPreview(r){
+  document.getElementById('emailPreview').innerHTML=`
+    <div class="email-header">
+      <div class="email-meta">To: ${r.email} &middot; From: reservations@staysync.demo</div>
+      <div class="email-subject">Your check-in details for ${r.apt} are ready &#128273;</div>
+    </div>
+    <div class="email-body">
+      <div class="hi">Hello, ${r.name.split(' ')[0]}!</div>
+      <p>Your stay at <strong>${r.apt}</strong> begins today. Here is your private door access code:</p>
+      <div class="code-block">
+        <div class="code-label">DOOR ACCESS CODE</div>
+        <div class="the-code">${r.code}</div>
+      </div>
+      <p style="font-size:12px;color:var(--muted)">Valid for ${r.nights} night${r.nights>1?'s':''}. Do not share it.</p>
+      <p style="margin-top:16px;font-size:13px">Issues? Reply to this email.</p>
+      <p style="margin-top:16px;font-size:13px;color:var(--muted)">Enjoy your stay! &#127968;</p>
+    </div>`;
+}
+
+function resetDemo(){
+  reservations=originalReservations.map(r=>({...r,checkin:r.checkin?new Date(r.checkin):null,checkout:r.checkout?new Date(r.checkout):null}));
+  sentCount=0;errorCount=0;currentReservation=null;currentResolve=null;
+  document.getElementById('s-sent').textContent='0';
+  document.getElementById('s-errors').textContent='0';
+  document.getElementById('progressBar').style.width='0%';
+  document.getElementById('log-status').textContent='Idle';
+  document.getElementById('log-status').classList.remove('pulsing');
+  document.getElementById('logBody').innerHTML='<div style="color:var(--muted);font-size:12px;font-family:\'DM Mono\',monospace;padding:8px;">// Waiting for automation to run...</div>';
+  document.getElementById('emailPreview').innerHTML='<div class="placeholder-text">Run the automation to preview the guest email</div>';
+  document.getElementById('mismatchBanner').classList.remove('show');
+  document.getElementById('runBtn').disabled=false;
+  document.getElementById('resetBtn').disabled=true;
+  renderTable();renderCalendar();
+  showToast('Demo reset &mdash; ready to run again','success');
+}
+
+// ── ADMIN PANEL ──────────────────────────────────────
+let rooms = []; // loaded from Sheets Rooms tab
+
+function openAdmin(){
+  document.getElementById('adminDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('show');
+  if(!HAS_SCRIPT) document.getElementById('noScriptWarn').style.display='block';
+  renderAdminList();
+}
+function closeAdmin(){
+  document.getElementById('adminDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('show');
+}
+function switchTab(tab){
+  ['add','list','rooms'].forEach(t=>{
+    document.getElementById(`panel-${t}`).style.display=t===tab?'block':'none';
+    document.getElementById(`tab-${t}`).classList.toggle('active',t===tab);
+  });
+  if(tab==='list')  renderAdminList();
+  if(tab==='rooms') renderRoomsList();
+}
+
+// Fires when either date changes — filters room dropdown to available only
+function onDatesChange(){
+  clearAvailability();
+  const ci=document.getElementById('f-checkin').value;
+  const co=document.getElementById('f-checkout').value;
+  const sel=document.getElementById('f-apt');
+  const hint=document.getElementById('aptHint');
+
+  if(!ci||!co||co<=ci){
+    sel.innerHTML='<option value="">— select dates to see available rooms —</option>';
+    sel.disabled=true;
+    sel.style.opacity='0.5';
+    sel.style.cursor='not-allowed';
+    hint.textContent='(select dates first)';
+    return;
+  }
+
+  // Filter rooms that have no overlapping reservation
+  const ciDate=new Date(ci); ciDate.setHours(0,0,0,0);
+  const coDate=new Date(co); coDate.setHours(0,0,0,0);
+  const editRow=document.getElementById('editRow').value;
+  const editId=editRow?reservations.find(r=>String(r._row)===String(editRow))?.id:null;
+
+  const available=rooms.filter(room=>{
+    return !reservations.some(r=>{
+      if(r.apt!==room.room_id) return false;
+      if(editId&&r.id===editId) return false;
+      const rci=r.checkin?new Date(r.checkin):null;
+      const rco=r.checkout?new Date(r.checkout):null;
+      if(!rci||!rco) return false;
+      rci.setHours(0,0,0,0);rco.setHours(0,0,0,0);
+      return ciDate<rco&&coDate>rci;
+    });
+  });
+
+  const current=sel.value;
+  sel.innerHTML='<option value="">— select available room —</option>';
+  if(!available.length){
+    sel.innerHTML='<option value="">No rooms available for those dates</option>';
+    sel.disabled=true;
+    sel.style.opacity='0.5';
+    hint.textContent='(no rooms available)';
+    hint.style.color='var(--danger)';
+  } else {
+    available.forEach(r=>{
+      const opt=document.createElement('option');
+      opt.value=r.room_id;
+      opt.textContent=`${r.room_id}${r.name&&r.name!==r.room_id?' — '+r.name:''}${r.capacity?' · '+r.capacity+' guests':''}`;
+      sel.appendChild(opt);
+    });
+    if(current) sel.value=current;
+    sel.disabled=false;
+    sel.style.opacity='1';
+    sel.style.cursor='pointer';
+    hint.textContent=`(${available.length} available)`;
+    hint.style.color='var(--success)';
+  }
+}
+
+// Populate all rooms (used when editing — bypass date filter to show current room)
+function populateRoomDropdown(selectedRoom){
+  const sel=document.getElementById('f-apt');
+  sel.innerHTML='<option value="">— select room —</option>';
+  rooms.forEach(r=>{
+    const opt=document.createElement('option');
+    opt.value=r.room_id;
+    opt.textContent=`${r.room_id}${r.name&&r.name!==r.room_id?' — '+r.name:''}`;
+    sel.appendChild(opt);
+  });
+  sel.disabled=false;
+  sel.style.opacity='1';
+  sel.style.cursor='pointer';
+  if(selectedRoom) sel.value=selectedRoom;
+  document.getElementById('aptHint').textContent='(editing — all rooms shown)';
+  document.getElementById('aptHint').style.color='var(--warn)';
+}
+
+// ── AVAILABILITY SUGGESTION ──────────────────────────
+function clearAvailability(){
+  document.getElementById('availSection').classList.remove('show');
+  document.getElementById('formError').classList.remove('show');
+}
+
+function showAvailableRooms(available){
+  const section=document.getElementById('availSection');
+  const list=document.getElementById('availList');
+  list.innerHTML='';
+  if(!available||!available.length){
+    list.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px;">No rooms available for those dates.</div>';
+  } else {
+    available.forEach(r=>{
+      const div=document.createElement('div');
+      div.className='avail-item';
+      div.innerHTML=`
+        <div class="avail-item-info">
+          <div class="avail-item-id">${r.room_id}</div>
+          <div class="avail-item-meta">${r.name||''} ${r.capacity?'· '+r.capacity+' guests':''} ${r.floor?'· Floor '+r.floor:''}</div>
+        </div>
+        <button class="btn-use-room" onclick="useRoom('${r.room_id}')">Use this room</button>`;
+      list.appendChild(div);
+    });
+  }
+  section.classList.add('show');
+}
+
+function useRoom(roomId){
+  document.getElementById('f-apt').value=roomId;
+  document.getElementById('availSection').classList.remove('show');
+  document.getElementById('formError').classList.remove('show');
+  showToast(`Room ${roomId} selected`,'success');
+}
+
+// ── MANAGE LIST ──────────────────────────────────────
+function renderAdminList(){
+  const list=document.getElementById('adminList');
+  if(!reservations.length){list.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">No reservations loaded.</div>';return;}
+  list.innerHTML='';
+  reservations.forEach(r=>{
+    const ci=r.checkin?new Date(r.checkin):null;
+    const co=r.checkout?new Date(r.checkout):null;
+    const fmt=d=>d?d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'—';
+    const div=document.createElement('div');
+    div.className='admin-list-item';
+    div.innerHTML=`
+      <div class="ali-name">${r.name} <span style="color:var(--muted);font-weight:400;font-size:11px">${r.email}</span></div>
+      <div class="ali-meta">${r.apt} &nbsp;·&nbsp; ${fmt(ci)} → ${fmt(co)} &nbsp;·&nbsp; ${r.nights}n &nbsp;·&nbsp;
+        <span style="color:${r.status==='arriving'?'var(--accent)':r.status==='sent'?'var(--success)':'var(--muted)'}">${r.status}</span>
+      </div>
+      <div class="ali-actions">
+        <button class="btn-edit" onclick="editReservation(${r.id})">&#9998; Edit</button>
+        <button class="btn-status" onclick="toggleStatus(${r.id})">${r.status==='arriving'?'→ Upcoming':'→ Arriving'}</button>
+        <button class="btn-delete" onclick="deleteReservationById(${r.id})">&#128465; Delete</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function editReservation(id){
+  const r=reservations.find(x=>x.id===id);
+  if(!r) return;
+  const fmt=d=>d?new Date(d).toISOString().split('T')[0]:'';
+  document.getElementById('editRow').value=r._row||'';
+  document.getElementById('f-checkin').value=fmt(r.checkin);
+  document.getElementById('f-checkout').value=fmt(r.checkout);
+  populateRoomDropdown(r.apt); // show all rooms when editing
+  document.getElementById('f-name').value=r.name;
+  document.getElementById('f-email').value=r.email;
+  document.getElementById('f-code').value=r.code;
+  document.getElementById('f-status').value=r.status==='arriving'?'arriving':'future';
+  document.getElementById('f-valid').value=r.valid?'true':'false';
+  document.getElementById('submitBtn').textContent='&#10003; Save Changes';
+  document.getElementById('cancelEditBtn').style.display='block';
+  clearAvailability();
+  switchTab('add');
+}
+
+function cancelEdit(){
+  resetForm();
+  document.getElementById('submitBtn').textContent='&#43; Add Reservation';
+  document.getElementById('cancelEditBtn').style.display='none';
+  document.getElementById('editRow').value='';
+  clearAvailability();
+}
+
+function resetForm(){
+  ['f-name','f-email','f-code','f-checkin','f-checkout'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-status').value='future';
+  document.getElementById('f-valid').value='true';
+  // Reset apartment dropdown to locked state
+  const sel=document.getElementById('f-apt');
+  sel.innerHTML='<option value="">— select dates to see available rooms —</option>';
+  sel.disabled=true;
+  sel.style.opacity='0.5';
+  sel.style.cursor='not-allowed';
+  document.getElementById('aptHint').textContent='(select dates first)';
+  document.getElementById('aptHint').style.color='var(--muted)';
+  clearAvailability();
+}
+
+// ── SUBMIT FORM ──────────────────────────────────────
+async function submitForm(){
+  const btn=document.getElementById('submitBtn');
+  clearAvailability();
+
+  const data={
+    name:          document.getElementById('f-name').value.trim(),
+    email:         document.getElementById('f-email').value.trim(),
+    apartment:     document.getElementById('f-apt').value.trim().toUpperCase(),
+    door_code:     document.getElementById('f-code').value.trim(),
+    checkin_date:  document.getElementById('f-checkin').value,
+    checkout_date: document.getElementById('f-checkout').value,
+    status:        document.getElementById('f-status').value,
+    valid:         document.getElementById('f-valid').value==='true',
+  };
+  data.code_apartment=data.apartment;
+  const editRow=document.getElementById('editRow').value;
+
+  // Client-side validation
+  if(!data.name)          {showFormError('Guest name is required');return;}
+  if(!data.email)         {showFormError('Email is required');return;}
+  if(!data.apartment)     {showFormError('Please select a room');return;}
+  if(!data.door_code)     {showFormError('Door code is required');return;}
+  if(!data.checkin_date)  {showFormError('Check-in date is required');return;}
+  if(!data.checkout_date) {showFormError('Check-out date is required');return;}
+  if(data.checkout_date<=data.checkin_date){showFormError('Check-out must be after check-in');return;}
+
+  // Client-side overlap check
+  const ci=new Date(data.checkin_date); ci.setHours(0,0,0,0);
+  const co=new Date(data.checkout_date); co.setHours(0,0,0,0);
+  const editId=editRow?reservations.find(r=>String(r._row)===String(editRow))?.id:null;
+  const conflict=reservations.find(r=>{
+    if(r.apt!==data.apartment) return false;
+    if(editId&&r.id===editId) return false;
+    const rci=r.checkin?new Date(r.checkin):null;
+    const rco=r.checkout?new Date(r.checkout):null;
+    if(!rci||!rco) return false;
+    rci.setHours(0,0,0,0);rco.setHours(0,0,0,0);
+    return ci<rco&&co>rci;
+  });
+
+  if(conflict){
+    // Find available rooms client-side
+    const available=rooms.filter(room=>{
+      if(room.room_id===data.apartment) return false;
+      return !reservations.some(r=>{
+        if(r.apt!==room.room_id) return false;
+        const rci=r.checkin?new Date(r.checkin):null;
+        const rco=r.checkout?new Date(r.checkout):null;
+        if(!rci||!rco) return false;
+        rci.setHours(0,0,0,0);rco.setHours(0,0,0,0);
+        return ci<rco&&co>rci;
+      });
+    });
+    showFormError(`&#9888; ${data.apartment} is already booked by ${conflict.name} during those dates.`);
+    showAvailableRooms(available);
+    return;
+  }
+
+  btn.disabled=true;btn.textContent='Saving...';
+
+  if(HAS_SCRIPT){
+    try{
+      const action=editRow?'update':'add';
+      const body=editRow?{action,row:parseInt(editRow),data}:{action,data};
+      const res=await fetch(CONFIG.APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify(body)});
+      const json=await res.json();
+      if(!json.success){
+        showFormError(json.error||'Error saving');
+        if(json.available) showAvailableRooms(json.available);
+        btn.disabled=false;btn.textContent=editRow?'&#10003; Save Changes':'&#43; Add Reservation';
+        return;
+      }
+      showToast(editRow?'Reservation updated ✓':'Reservation added ✓','success');
+    }catch(e){
+      showFormError('Could not reach Apps Script. Check your URL.');
+      btn.disabled=false;btn.textContent=editRow?'&#10003; Save Changes':'&#43; Add Reservation';
+      return;
+    }
+  } else {
+    showToast('Demo mode — configure APPS_SCRIPT_URL to persist changes','warn');
+  }
+
+  btn.disabled=false;btn.textContent='&#43; Add Reservation';
+  cancelEdit();
+  await loadFromSheets();
+}
+
+function showFormError(msg){
+  const el=document.getElementById('formError');
+  el.innerHTML=msg;
+  el.classList.add('show');
+}
+
+// ── DELETE RESERVATION ───────────────────────────────
+async function deleteReservationById(id){
+  const r=reservations.find(x=>x.id===id);
+  if(!r||!confirm(`Delete reservation for ${r.name}?`)) return;
+  if(HAS_SCRIPT&&r._row){
+    try{
+      const res=await fetch(CONFIG.APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'delete',row:r._row})});
+      const json=await res.json();
+      if(!json.success){showToast('Delete failed: '+json.error,'error');return;}
+    }catch(e){showToast('Could not reach Apps Script','error');return;}
+  }
+  showToast(`${r.name} deleted`,'warn');
+  await loadFromSheets();
+  renderAdminList();
+}
+
+// ── TOGGLE STATUS ────────────────────────────────────
+async function toggleStatus(id){
+  const r=reservations.find(x=>x.id===id);
+  if(!r) return;
+  const newStatus=r.status==='arriving'?'future':'arriving';
+  if(HAS_SCRIPT&&r._row){
+    const ci=r.checkin?new Date(r.checkin).toISOString().split('T')[0]:'';
+    const co=r.checkout?new Date(r.checkout).toISOString().split('T')[0]:'';
+    try{
+      await fetch(CONFIG.APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'update',row:r._row,data:{
+        name:r.name,email:r.email,apartment:r.apt,code_apartment:r.aptCode,
+        door_code:r.code,checkin_date:ci,checkout_date:co,status:newStatus,valid:r.valid
+      }})});
+    }catch(e){showToast('Could not reach Apps Script','error');return;}
+  }
+  r.status=newStatus;
+  showToast(`${r.name} → ${newStatus}`,'success');
+  renderTable();renderCalendar();renderAdminList();
+}
+
+// ── ROOMS MANAGEMENT ─────────────────────────────────
+function renderRoomsList(){
+  const list=document.getElementById('roomsList');
+  if(!rooms.length){list.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">No rooms found. Add one above.</div>';return;}
+  list.innerHTML='';
+  rooms.forEach(r=>{
+    const div=document.createElement('div');
+    div.className='admin-list-item';
+    div.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div class="room-item-id">${r.room_id}</div>
+          <div class="room-item-meta">${r.name||''} ${r.capacity?'· '+r.capacity+' guests':''} ${r.floor?'· Floor '+r.floor:''}</div>
+        </div>
+        <button class="btn-delete" onclick="deleteRoomById(${r._row})">&#128465;</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+async function submitRoom(){
+  const data={
+    room_id:  document.getElementById('r-id').value.trim().toUpperCase(),
+    name:     document.getElementById('r-name').value.trim(),
+    capacity: parseInt(document.getElementById('r-capacity').value)||2,
+    floor:    document.getElementById('r-floor').value.trim(),
+  };
+  const errEl=document.getElementById('roomError');
+  errEl.classList.remove('show');
+  if(!data.room_id){errEl.innerHTML='Room ID is required';errEl.classList.add('show');return;}
+
+  if(HAS_SCRIPT){
+    try{
+      const res=await fetch(CONFIG.APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'addRoom',data})});
+      const json=await res.json();
+      if(!json.success){errEl.innerHTML=json.error;errEl.classList.add('show');return;}
+    }catch(e){errEl.innerHTML='Could not reach Apps Script';errEl.classList.add('show');return;}
+  }
+  ['r-id','r-name','r-capacity','r-floor'].forEach(id=>document.getElementById(id).value='');
+  showToast(`Room ${data.room_id} added`,'success');
+  await loadFromSheets();
+  renderRoomsList();
+  populateRoomDropdown();
+}
+
+async function deleteRoomById(rowNum){
+  if(!confirm('Delete this room?')) return;
+  if(HAS_SCRIPT){
+    try{
+      const res=await fetch(CONFIG.APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'deleteRoom',row:rowNum})});
+      const json=await res.json();
+      if(!json.success){showToast('Delete failed: '+json.error,'error');return;}
+    }catch(e){showToast('Could not reach Apps Script','error');return;}
+  }
+  showToast('Room deleted','warn');
+  await loadFromSheets();
+  renderRoomsList();
+  populateRoomDropdown();
+}
+
+loadFromSheets();
+</script>
+</body>
+</html>
