@@ -1,6 +1,6 @@
 # StaySync — Reservation Automation Demo
 
-Public, no-login demo of the property-reservation tool that powers the production **Conecta-Nuntui** app. Tracks short-term rental guests, sends door codes via email, and previews how the same UI behaves for different staff roles.
+Public, no-login demo of the property-reservation tool that powers the production **StaySync** app (private repo: `staysync-prod`). Tracks short-term rental guests, sends door codes via email, and previews how the same UI behaves for different staff roles.
 
 The whole app lives in [`index.html`](index.html) — open it directly in any browser. No build step, no install, no server required. It talks to a shared demo Google Sheet for reads and a deployed Apps Script for writes.
 
@@ -33,7 +33,7 @@ Real authentication doesn't fit a public, zero-login demo, so the header include
 
 Because there's no real auth, switching role is not a security boundary — anyone could flip it from devtools. It's purely a preview affordance.
 
-## Differences from the production Conecta-Nuntui app
+## Differences from the production StaySync app
 
 | Feature                | Demo                              | Production                        |
 |------------------------|-----------------------------------|-----------------------------------|
