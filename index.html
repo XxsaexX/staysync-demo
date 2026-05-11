@@ -998,7 +998,7 @@ async function loadFromSheets(){
         // valid = code exists AND no double booking (computed below)
         valid:    !!codeEntry,
       };
-    });
+    }).filter(r => r.checkout && r.checkout >= TODAY);
 
     // Compute double-booking flags
     const todayStr = TODAY.toISOString().split('T')[0];
@@ -2053,12 +2053,17 @@ function renderRoomsList(){
   if(!rooms.length){list.innerHTML=`<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">${t('empty.rooms')}</div>`;return;}
   list.innerHTML='';
   rooms.forEach(r=>{
+    const isBooked = reservations.some(res => res.apt === r.room_id);
+    const bookedLabel = isBooked ? ` <span style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;margin-left:6px;background:rgba(201,245,66,0.1);font-weight:600;">Booked</span>` : '';
+    const extraStyle = isBooked ? `border-color: rgba(201,245,66,0.4); background: rgba(201,245,66,0.05);` : '';
+
     const div=document.createElement('div');
     div.className='admin-list-item';
+    if(extraStyle) div.style.cssText = extraStyle;
     div.innerHTML=`
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div class="room-item-id">${r.room_id}</div>
+          <div class="room-item-id" style="display:flex;align-items:center;">${r.room_id}${bookedLabel}</div>
           <div class="room-item-meta">${r.name||''} ${r.capacity?'· '+r.capacity+' guests':''} ${r.floor?'· Floor '+r.floor:''}</div>
         </div>
         ${hasPermission('manage_rooms')?`<button class="btn-delete" onclick="deleteRoomById(${r._row})">&#128465;</button>`:''}
@@ -2123,7 +2128,15 @@ async function seedDefaultRooms(){
 }
 
 async function deleteRoomById(rowNum){
-  if(!confirm('Delete this room?')) return;
+  const r = rooms.find(x => x._row === rowNum);
+  const isBooked = r && reservations.some(res => res.apt === r.room_id);
+
+  if(isBooked){
+    if(!confirm('This room has bookings. The room will be removed but the reservations will remain referencing it — clean them up manually after. Continue?')) return;
+  } else {
+    if(!confirm('Delete this room?')) return;
+  }
+
   if(HAS_SCRIPT){
     try{
       const res=await scriptPost({action:'deleteRoom',row:rowNum});
